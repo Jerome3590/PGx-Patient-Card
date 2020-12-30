@@ -1,0 +1,142 @@
+---
+title: "PGx"
+author: "Jerome Dixon"
+date: "12/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+library(readr)
+library(dplyr) 
+library(magrittr) 
+library(janitor) 
+library(tidyr) 
+library(purrr) 
+library(tidyverse) 
+library(reshape2)
+
+```
+
+# Preformat incoming excel spreadsheet: gene,Variant1,Variant2,Variant3, Variant4..
+
+```{r Read in Data}
+
+pgx <- read_excel("data/pgx_analysis.xlsx")
+
+
+# Drop any extra empty columns
+pgx <- janitor::remove_empty(pgx, which = "cols") 
+
+# Drop NAs and INFs
+is.na(pgx)<-sapply(pgx, is.infinite) 
+pgx[is.na(pgx)] <- 0
+
+
+```
+
+
+```{r Convert From Wide to Long Format}
+
+pgx_data_long <- gather(pgx, allele, allele_count, 2:53, factor_key=TRUE)
+
+
+# Drop Zeros
+pgx_data_long <- pgx_data_long[pgx_data_long$allele_count != 0, ]
+
+
+pgx_data_long %<>% separate(allele, c("Gene", "Variant1", "Variant2", "Variant3"), sep = "([,])")
+
+
+# Drop NAs and INFs
+is.na(pgx_data_long)<-sapply(pgx_data_long, is.infinite) 
+pgx_data_long[is.na(pgx_data_long)] <- "0"
+
+
+```
+
+
+```{r FDA Recommendations}
+
+library(rvest)
+
+pgx_fda <- read_html("https://www.fda.gov/medical-devices/precision-medicine/table-pharmacogenetic-associations")
+
+
+pgx_tables <- pgx_fda %>% html_table(trim = TRUE, fill = FALSE)
+
+
+pgx_associations1 <- pgx_tables[[1]]
+pgx_associations2 <- pgx_tables[[2]]
+pgx_associations3 <- pgx_tables[[3]]
+
+
+FDA_df <- bind_rows(pgx_associations1, pgx_associations2, pgx_associations3)
+
+
+```
+
+
+```{r PharmGKB API}
+
+
+library(httr)
+library(jsonlite)
+
+base_url <- "https://api.pharmgkb.org/v1/data/gene?symbol="
+
+pgx_data_long$URL <- paste0(base_url,pgx_data_long$Gene, sep="")
+
+gene_URLs <- as.data.frame(pgx_data_long$URL) %>% unique()
+names(gene_URLs) <- "URL"
+
+pharm_gkb_list <- map(gene_URLs$URL, ~{
+
+  Sys.sleep(sample(seq(0.5, 2.5, 0.5), 1)) 
+
+  res <- httr::GET(.x)
+
+  httr::content(res, as="text", encoding="UTF-8") %>% 
+    fromJSON(flatten=TRUE) 
+
+})
+
+
+# List of dataframes
+pharm_gkb_dfs_list <- lapply(pharm_gkb_list, data.frame, stringsAsFactors = FALSE)
+
+
+# Row bind list of dataframes to one dataframe
+pharm_GKB_df <- bind_rows(pharm_gkb_dfs_list)
+
+
+```
+
+
+```{r Final PGx Dataframe}
+
+
+PGx_df_step1 <- left_join(pgx_data_long, FDA_df, by=c("Gene" = "Gene"))
+
+PGx_df_step2 <- left_join(PGx_df_step1, pharm_GKB_df, by=c("Gene" = "data.symbol"))
+
+PGx_data <- PGx_df_step2 %>% select(1:6,8:10,15,29)
+
+# Drop NAs and INFs
+is.na(PGx_data)<-sapply(PGx_data, is.infinite) 
+PGx_data[is.na(PGx_data)] <- "0"
+
+
+```
+
+
+
+```{r Save df}
+
+write.csv(PGx_data,"pgx_data.csv")
+
+
+```
+
