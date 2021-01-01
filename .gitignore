@@ -1,0 +1,7 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+**/data/pgx_analysis.xlsx
+**/data/pgx_data.csv
+
