@@ -9,6 +9,11 @@ library(purrr)
 library(tidyverse) 
 library(reshape2)
 library(here)
+library(gridExtra)
+library(grid)
+library(gtable)
+library(flextable)
+library(officer)
 
 
 pgx_data <- read_csv("pgx_data.csv")
@@ -20,11 +25,6 @@ card_layout_fields <- read_csv("data/card_layout.csv")
 images <- read_csv("base64_icons.csv")
 names(images)[1] <- "Index"
 
-
-
-library(gridExtra)
-library(grid)
-library(gtable)
 
 
 
