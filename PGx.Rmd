@@ -127,10 +127,10 @@ r <- GET("https://api.cpicpgx.org/data/cpicPairs.csv")
 
 # Save to file
 bin <- content(r, "raw")
-writeBin(bin, "cpic.csv")
+writeBin(bin, "data/cpic.csv")
 
 # Read as csv
-CPIC_df = read_csv("cpic.csv", skip = 1)
+CPIC_df = read_csv("data/cpic.csv", skip = 1)
 
 
 ```
