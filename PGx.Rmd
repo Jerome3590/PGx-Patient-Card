@@ -75,6 +75,8 @@ pgx_associations3 <- pgx_tables[[3]]
 
 FDA_df <- bind_rows(pgx_associations1, pgx_associations2, pgx_associations3)
 
+FDA_df[[1]] <- tolower(FDA_df[[1]])
+
 
 ```
 
@@ -115,6 +117,26 @@ pharm_GKB_df <- bind_rows(pharm_gkb_dfs_list)
 ```
 
 
+```{r CPIC PGx}
+
+
+library(httr)
+
+
+r <- GET("https://api.cpicpgx.org/data/cpicPairs.csv")
+
+# Save to file
+bin <- content(r, "raw")
+writeBin(bin, "cpic.csv")
+
+# Read as csv
+CPIC_df = read_csv("cpic.csv", skip = 1)
+
+
+```
+
+
+
 ```{r Final PGx Dataframe}
 
 
@@ -122,7 +144,9 @@ PGx_df_step1 <- left_join(pgx_data_long, FDA_df, by=c("Gene" = "Gene"))
 
 PGx_df_step2 <- left_join(PGx_df_step1, pharm_GKB_df, by=c("Gene" = "data.symbol"))
 
-PGx_data <- PGx_df_step2 %>% select(1:6,8:10,15,29)
+PGx_df_step3 <- left_join(PGx_df_step2, CPIC_df, by=c("Gene" = "Gene", "Drug" = "Drug"))
+
+PGx_data <- PGx_df_step3 %>% select(1:6,8:10,32:35)
 
 # Drop NAs and INFs
 is.na(PGx_data)<-sapply(PGx_data, is.infinite) 
