@@ -8,3 +8,5 @@ pgx_data.csv
 renv.lock
 renv
 *.Rproj
+.git
+.gitignore
