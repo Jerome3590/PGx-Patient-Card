@@ -140,3 +140,18 @@ write.csv(PGx_data,"pgx_data.csv")
 
 ```
 
+
+```{r Convert Images to base64}
+
+source("base64_images.R")
+
+image_to_base64(here("icons"))
+
+
+```
+
+
+
+
+
+
