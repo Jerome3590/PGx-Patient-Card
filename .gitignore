@@ -11,3 +11,5 @@ renv/*
 .git
 .gitignore
 pgx_data.xlsx
+functions.R
+vip_lookup.R

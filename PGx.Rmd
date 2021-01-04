@@ -157,25 +157,37 @@ pharm_GKB_df <- bind_rows(pharm_gkb_dfs_list)
 library(rvest)
 
 
-r <-GET("https://api.pharmgkb.org/v1/site/vips")
-vip_list <- content(r, as="text", encoding="UTF-8") %>% 
+build_VIP_df <- function() {
+  
+  r <-GET("https://api.pharmgkb.org/v1/site/vips")
+  vip_list <- content(r, as="text", encoding="UTF-8") %>% 
     fromJSON(flatten=TRUE) 
-
-vip_df <- bind_rows(vip_list["data"])
-
-
-strip_html <- function(s) {
+  
+  vip_df <- bind_rows(vip_list["data"])
+  
+  
+  strip_html <- function(s) {
     html_text(read_html(s))
+  }
+  
+  
+  vip_df["summary"][[1]] <- lapply(vip_df["summary"][[1]], strip_html)
+  
+  names(vip_df) <- str_to_title(names(vip_df))
+  
+  base_url <- "https://www.pharmgkb.org/vip/"
+  
+  vip_df$URL <- paste0(base_url,vip_df$Vipid, sep="")
+  
+  vip_df$QR_Filename <- paste0(vip_df$Gene,".png", sep="")
+  
+  return(vip_df)
+  
+  
 }
 
 
-vip_df["summary"][[1]] <- lapply(vip_df["summary"][[1]], strip_html)
-
-names(vip_df) <- str_to_title(names(vip_df))
-
-base_url <- "https://www.pharmgkb.org/vip/"
-
-vip_df$URL <- paste0(base_url,vip_df$Vipid, sep="")
+vip_df <- build_VIP_df()
 
 
 ```
@@ -211,8 +223,8 @@ end <- 1:nrow(vip_df)
 
 repeat {
   
-  png(vip_df[[8]][[start]])
-  qrcode_gen(vip_df[[7]][[start]])
+  png(vip_df[[7]][[start]])
+  qrcode_gen(vip_df[[6]][[start]])
   dev.off()
   
   start = start + 1
