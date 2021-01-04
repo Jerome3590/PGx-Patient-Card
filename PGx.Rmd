@@ -17,6 +17,7 @@ library(tidyr)
 library(purrr) 
 library(tidyverse) 
 library(reshape2)
+library(stringr)
 
 ```
 
@@ -117,6 +118,79 @@ pharm_GKB_df <- bind_rows(pharm_gkb_dfs_list)
 ```
 
 
+
+```{r PharmGKB VIP Data}
+
+
+r <-GET("https://api.pharmgkb.org/v1/site/vips")
+vip_list <- content(r, as="text", encoding="UTF-8") %>% 
+    fromJSON(flatten=TRUE) 
+
+vip_df <- bind_rows(vip_list["data"])
+
+strip_html <- function(s) {
+    html_text(read_html(s))
+}
+
+
+vip_df["summary"][[1]] <- lapply(vip_df$summary[[1]] , strip_html)
+
+names(vip_df) <- str_to_title(names(vip_df))
+
+
+base_url <- "https://www.pharmgkb.org/vip/"
+
+vip_df$URL <- paste0(base_url,vip_df$Vipid, sep="")
+
+
+```
+
+
+
+```{r VIP QR Code Images}
+
+library(qrcode)
+
+start <- 1
+end <- 1:nrow(vip_df)
+
+repeat {
+  
+  png(vip_df[[8]][[start]])
+  qrcode_gen(vip_df[[7]][[start]])
+  dev.off()
+  
+  start = start + 1
+  
+  if ( start == end) {
+    break
+  }
+  
+}
+
+# Create folder 'qr_codes' and move all images here
+
+```
+
+
+```{r QR Code Images base64 Encoded}
+
+library(filesstrings)
+
+source("base64_images.R")
+
+# Point function to previously created 'qr_codes' folder
+# Convert images to base64
+image_to_base64(here("qr_codes"))
+
+
+# Move file to 'data' subfolder
+file.move("base64_qr_codes.csv", "data")
+
+```
+
+
+
 ```{r CPIC PGx}
 
 
@@ -140,17 +214,17 @@ CPIC_df = read_csv("data/cpic.csv", skip = 1)
 ```{r Final PGx Dataframe}
 
 
-PGx_df_step1 <- left_join(pgx_data_long, FDA_df, by=c("Gene" = "Gene"))
+PGx_df_step1 <- left_join(pgx_data_long, CPIC_df, by=c("Gene" = "Gene"))
 
 PGx_df_step2 <- left_join(PGx_df_step1, pharm_GKB_df, by=c("Gene" = "data.symbol"))
 
-PGx_df_step3 <- left_join(PGx_df_step2, CPIC_df, by=c("Gene" = "Gene", "Drug" = "Drug"))
+PGx_df_step3 <- left_join(PGx_df_step2, FDA_df, by=c("Gene" = "Gene"))
 
-PGx_data <- PGx_df_step3 %>% select(1:6,8:10,32:35)
+#PGx_data <- PGx_df_step3 %>% select(1:6,8:10,32:35)
 
 # Drop NAs and INFs
-is.na(PGx_data)<-sapply(PGx_data, is.infinite) 
-PGx_data[is.na(PGx_data)] <- "0"
+#is.na(PGx_data)<-sapply(PGx_data, is.infinite) 
+#PGx_data[is.na(PGx_data)] <- "0"
 
 
 ```
@@ -165,7 +239,7 @@ write.csv(PGx_data,"pgx_data.csv")
 ```
 
 
-```{r Convert Images to base64}
+```{r Convert Icon Images to base64}
 
 source("base64_images.R")
 

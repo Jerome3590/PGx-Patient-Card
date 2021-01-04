@@ -51,7 +51,7 @@ xlsx_card_back <- read_excel(here("data","PGx-card-layout.xlsx"), sheet = "back"
 xlsx_card_all <- read_excel(here("data","PGx-card-layout.xlsx"), sheet = "consolidated", col_names = TRUE)
 
 
-images <- read_csv("base64_icons.csv")
+images <- read_csv("data/base64_icons.csv")
 names(images)[1] <- "Index"
 
 
@@ -62,12 +62,13 @@ names(images)[1] <- "Index"
 
 ```{r}
 
-cards <- pgx_data %>% group_by(`Sample ID`) %>% select(3:10) %>% unique()
+cards <- pgx_data %>% group_by(`Sample ID`) %>% select(-1) %>% unique()
 
-sample1 <- cards %>% filter(`Sample ID`== "R208")
-sample1 %<>% group_by(Gene) %>% unique()
-sample1_genes <- sample1 %>% select(Gene, Variant1, Variant2, Variant3, allele_count) %>% unique()
-sample1_drugs <- sample1 %>% select(7:9) %>% unique()
+sample1 <- cards %>% filter(`Sample ID`== "R208") %>% group_by(Gene)
+
+sample1_genes <- sample1 %>% select(`Sample ID`, Gene, Variant1, Variant2, Variant3, allele_count) %>% unique()
+
+sample1_drugs <- sample1 %>% select(1,2,7:13) %>% unique()
 
 
 
