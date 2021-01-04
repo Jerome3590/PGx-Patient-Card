@@ -10,3 +10,4 @@ renv/*
 *.Rproj
 .git
 .gitignore
+pgx_data.xlsx
