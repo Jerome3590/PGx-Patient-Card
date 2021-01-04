@@ -59,6 +59,27 @@ pgx_data_long[is.na(pgx_data_long)] <- "0"
 ```
 
 
+
+```{r CPIC PGx}
+
+
+library(httr)
+
+
+r <- GET("https://api.cpicpgx.org/data/cpicPairs.csv")
+
+# Save to file
+bin <- content(r, "raw")
+writeBin(bin, "data/cpic.csv")
+
+# Read as csv
+CPIC_df = read_csv("data/cpic.csv", skip = 1)
+
+
+```
+
+
+
 ```{r FDA Recommendations}
 
 library(rvest)
@@ -74,12 +95,24 @@ pgx_associations2 <- pgx_tables[[2]]
 pgx_associations3 <- pgx_tables[[3]]
 
 
-FDA_df <- bind_rows(pgx_associations1, pgx_associations2, pgx_associations3)
+FDA_Recommendations_df <- bind_rows(pgx_associations1, pgx_associations2, pgx_associations3)
 
-FDA_df[[1]] <- tolower(FDA_df[[1]])
+FDA_Recommendations_df[[1]] <- tolower(FDA_Recommendations_df[[1]]) 
+
+FDA_Recommendations_df%<>% select(2,1,3,4)
 
 
 ```
+
+
+
+```{r FDA Dataframe}
+
+FDA_df <- full_join(CPIC_df, FDA_Recommendations_df, by=c("Gene" = "Gene", "Drug" = "Drug"))
+
+
+```
+
 
 
 ```{r PharmGKB API}
@@ -90,12 +123,12 @@ library(jsonlite)
 
 base_url <- "https://api.pharmgkb.org/v1/data/gene?symbol="
 
-pgx_data_long$URL <- paste0(base_url,pgx_data_long$Gene, sep="")
+pgx_data_long$URL_Query <- paste0(base_url,pgx_data_long$Gene, sep="")
 
-gene_URLs <- as.data.frame(pgx_data_long$URL) %>% unique()
-names(gene_URLs) <- "URL"
+gene_URLs <- as.data.frame(pgx_data_long$URL_Query) %>% unique()
+names(gene_URLs) <- "URL_Query"
 
-pharm_gkb_list <- map(gene_URLs$URL, ~{
+pharm_gkb_list <- map(gene_URLs$URL_Query, ~{
 
   Sys.sleep(sample(seq(0.5, 2.5, 0.5), 1)) 
 
@@ -121,6 +154,8 @@ pharm_GKB_df <- bind_rows(pharm_gkb_dfs_list)
 
 ```{r PharmGKB VIP Data}
 
+library(rvest)
+
 
 r <-GET("https://api.pharmgkb.org/v1/site/vips")
 vip_list <- content(r, as="text", encoding="UTF-8") %>% 
@@ -128,19 +163,39 @@ vip_list <- content(r, as="text", encoding="UTF-8") %>%
 
 vip_df <- bind_rows(vip_list["data"])
 
+
 strip_html <- function(s) {
     html_text(read_html(s))
 }
 
 
-vip_df["summary"][[1]] <- lapply(vip_df$summary[[1]] , strip_html)
+vip_df["summary"][[1]] <- lapply(vip_df["summary"][[1]], strip_html)
 
 names(vip_df) <- str_to_title(names(vip_df))
-
 
 base_url <- "https://www.pharmgkb.org/vip/"
 
 vip_df$URL <- paste0(base_url,vip_df$Vipid, sep="")
+
+
+```
+
+
+
+```{r Extra Formatting VIP Dataframe}
+
+list_df <- vip_df["Summary"][[1]]
+
+summary_matrix <- do.call(rbind, list_df)
+
+summary_df <- as.data.frame(summary_matrix)
+names(summary_df) <- "Summary"
+
+# Drop Summary (list)
+vip_df %<>% select(-4)
+
+# Add Summary Dataframe
+VIP_df <- cbind(vip_df, summary_df)
 
 
 ```
@@ -184,27 +239,30 @@ source("base64_images.R")
 image_to_base64(here("qr_codes"))
 
 
-# Move file to 'data' subfolder
+# Move file to 'data' subfolder for future processing
 file.move("base64_qr_codes.csv", "data")
 
 ```
 
 
 
-```{r CPIC PGx}
+```{r PharmGKB Dataframe}
 
-
-library(httr)
-
-
-r <- GET("https://api.cpicpgx.org/data/cpicPairs.csv")
-
-# Save to file
-bin <- content(r, "raw")
-writeBin(bin, "data/cpic.csv")
+GKB_df_step1 <- left_join(pharm_GKB_df, VIP_df, by=c("data.symbol" = "Gene"))
 
 # Read as csv
-CPIC_df = read_csv("data/cpic.csv", skip = 1)
+QR_code_df = read_csv("data/base64_qr_codes.csv")
+
+GKB_df <- left_join(GKB_df_step1, QR_code_df, by=c("data.symbol" = "Image"))
+
+GKB_df %<>% select(4,5,16,19,22,23,25,26,27,29)
+
+names(GKB_df)[1] <- "PharmGKB_GeneID"
+names(GKB_df)[2] <- "Gene"
+names(GKB_df)[3] <- "PharmGKB_Chromosome_URL"
+names(GKB_df)[4] <- "PharmGKB_ChromosomeID"
+names(GKB_df)[8] <- "PharmGKB_VIP_URL"
+names(GKB_df)[10] <- "QR_Code_Image"
 
 
 ```
@@ -214,17 +272,15 @@ CPIC_df = read_csv("data/cpic.csv", skip = 1)
 ```{r Final PGx Dataframe}
 
 
-PGx_df_step1 <- left_join(pgx_data_long, CPIC_df, by=c("Gene" = "Gene"))
+PGx_df_step1 <- left_join(pgx_data_long, FDA_df, by=c("Gene" = "Gene"))
 
-PGx_df_step2 <- left_join(PGx_df_step1, pharm_GKB_df, by=c("Gene" = "data.symbol"))
+PGx_df <- left_join(PGx_df_step1, GKB_df, by=c("Gene" = "Gene")) 
 
-PGx_df_step3 <- left_join(PGx_df_step2, FDA_df, by=c("Gene" = "Gene"))
-
-#PGx_data <- PGx_df_step3 %>% select(1:6,8:10,32:35)
+PGx_df$Litid <- as.character(PGx_df$Litid)
 
 # Drop NAs and INFs
-#is.na(PGx_data)<-sapply(PGx_data, is.infinite) 
-#PGx_data[is.na(PGx_data)] <- "0"
+is.na(PGx_df)<-sapply(PGx_df, is.infinite) 
+PGx_df[is.na(PGx_df)] <- "0"
 
 
 ```
@@ -233,12 +289,12 @@ PGx_df_step3 <- left_join(PGx_df_step2, FDA_df, by=c("Gene" = "Gene"))
 
 ```{r Save df}
 
-write.csv(PGx_data,"pgx_data.csv")
-
+write.csv(PGx_df,"pgx_data.csv")
 
 ```
 
 
+# PGx Card Icons
 ```{r Convert Icon Images to base64}
 
 source("base64_images.R")
