@@ -1,4 +1,7 @@
 
+library(renv)
+renv:::activate()
+
 library(readxl)
 library(readr)
 library(dplyr) 
@@ -17,79 +20,101 @@ library(officer)
 
 
 pgx_data <- read_csv("pgx_data.csv")
-names(pgx_data)[1] <- "Index"
-
-card_layout_fields <- read_csv("data/card_layout.csv")
 
 
-images <- read_csv("base64_icons.csv")
-names(images)[1] <- "Index"
-
-
-
-
-cards <- pgx_data %>% group_by(`Sample ID`) %>% select(3:10) %>% unique()
+cards <- pgx_data %>% group_by(`Sample ID`) %>% select(1:6,8,25) %>% unique()
 
 
 sample1 <- cards %>% filter(`Sample ID`== "R208")
 sample1 %<>% group_by(Gene) %>% unique()
-sample1_genes <- sample1 %>% select(Gene, Variant1, Variant2, Variant3, allele_count) %>% unique()
-sample1_drugs <- sample1 %>% select(7:9) %>% unique()
 
 
-drugs <- rbind(sample1_drugs[2]) 
-Drugs <- drugs %>% dplyr::summarise(Drugs = paste(Drug, collapse = ", "))
+# Format Drugs
+allele2 <- sample1 %>% filter(allele_count == "2") 
+drugs_allele2 <- rbind(allele2["Drug"]) %>% unique()
+drugs_allele2 %<>% filter(Drug != "0")
+allele2_drugs <- drugs_allele2 %>% dplyr::summarise(Drugs = paste(Drug, collapse = ", "))
 
 
-drugs_wrapped <- strwrap(Drugs, width = 65, simplify = FALSE) # modify 30 to your needs
+allele1 <- sample1 %>% filter(allele_count == "1") 
+drugs_allele1 <- rbind(allele1["Drug"]) %>% unique()
+drugs_allele1 %<>% filter(Drug != "0")
+allele1_drugs <- drugs_allele1 %>% dplyr::summarise(Drugs = paste(Drug, collapse = ", "))
+
+
+drugs_wrapped <- strwrap(allele2_drugs$Drugs, width = 65, simplify = FALSE) # modify 30 to your needs
 drugs_new <- sapply(drugs_wrapped, paste, collapse = "\n")
-d <- data.frame(drugs_new)
-names(d) <- "Drugs"
+Allele2 <- data.frame(drugs_new)
+names(Allele2) <- "Drugs"
+
+drugs_wrapped <- strwrap(allele1_drugs$Drugs, width = 65, simplify = FALSE) # modify 30 to your needs
+drugs_new <- sapply(drugs_wrapped, paste, collapse = "\n")
+Allele1 <- data.frame(drugs_new)
+names(Allele1) <- "Drugs"
+
+
+# Format Genes and QR Codes
+QR_codes <- sample1 %>% select(1:6,8) %>% unique()
+
+
+# Genes with more than one entry - Consolidate variants
+gene_multiple <- QR_codes %>%
+  group_by(Gene) %>%
+  filter(n() >1 )
+
+
+Variants_single <- gather(gene_multiple, Variant, Variants, Variant1:Variant3, factor_key=TRUE)
+Variants_single %<>% filter(Variants != "0")
+allele_variants <- Variants_single %>% dplyr::summarise(Variants = paste(Variants, collapse = ", "))
+
+gene_card_step1 <- cbind(Variants_single[1,1], allele_variants, Variants_single[1,3], Variants_single[1,4])
 
 
 
-card_poc <- as.data.frame(card_layout[5:9])
+# Genes with one entry
+gene <- QR_codes %>%
+  group_by(Gene) %>%
+  filter(n() == 1 )
 
 
-# Card Front
-card_lin1 <- card_poc[1:2]
+Variants_df <- gather(gene, Variant, Variants, Variant1:Variant3, factor_key=TRUE)
+Variants_df %<>% filter(Variants != "0")
+allele_variants <- Variants_df %>% dplyr::summarise(Variants = paste(Variants, collapse = ", "))
 
-vcu_icon <- images[15,3]
-pgx_icon <- images[9,3]
+genes_df <- left_join(allele_variants, gene, by = c('Gene' = 'Gene'))
 
-card_lin2 <- card_poc[3:4]
-card_lin3 <- card_poc[5]
-
-
-# Card Back
-genes_pos1 <- sample1_genes
-drugs_pos2 <- Drugs
-
-
-a <- tableGrob(card_lin1)
-b <- tableGrob(card_lin2)
-c <- tableGrob(card_lin3)
-vcu <- tableGrob(vcu_icon)
-pgx <- tableGrob(pgx_icon)
-genes_card <- tableGrob(genes_pos1)
-drugs_card <- tableGrob(drugs_pos2)
+gene_card_step2 <- genes_df %>% select(3,1,2,7,8)
 
 
 
-grid.newpage()
+# Final Gene Info
+card_gene_info <- rbind(gene_card_step1, gene_card_step2)
 
 
-p1_a <- gtable_combine(a,b, along = 1)
-graphic <- gtable_combine(vcu, pgx, along = 1)
-p1 <- gtable_combine(graphic, c, along = 1)
+# Final Drug Info
+card_drug_info <- rbind(Allele2, Allele1)
+rownames(card_drug_info)[1] <- "Alleles_2"
+rownames(card_drug_info)[2] <- "Alleles_1"
 
-p2 <- gtable_combine(genes_card, drugs_card, along = 1)
 
-#grid.arrange()
 
-grid.draw(p1)
+# PGx Card Layout
+# Row Counts   1----- 2 -------3------- 4 ----------------- 5 -------------- 6 -- 7 - 8 - 9 -10 -- 11  ----- 12 -------- 13 ----------- 14   
+column1 <- c("Icon1", "", "Patient ID", "", "Genes Tested But Not Relevant", "", "", "", "", "", "Gene", "Variants", "Allele Count", "QR Code")
 
-grid.draw(p2)
+# Row Counts   1----------------------- 2 -----------------------3-------------------------- 4 --------------------------------------- 5 ------------------------------------ 6 -- 7 - 8 - 9 -10 -- 11  ----- 12 -------- 13 ----------- 14   
+column2 <- c("VCU PGx Research Study", "", "I particiapte in a VCU medication safety study", "", "The Following drugs may require dosing modifications due to gene markers:", "", "", "", "", "", "Gene", "Variants", "Allele Count", "QR Code")
+
+# Row Counts   1----- 2 --3-- 4 - 5 -------------- 6 ------------------ 7 --------------- 8 --------------- 9 ------------10 ------------- 11  ----- 12 -------- 13 ----------- 14  
+column3 <- c("Icon2", "", "", "", "", "VCU Points of Contact:", "Dr. Mackiewicz", "tel: 804.314.1417", "Dr. Price", "tel: 804.314.1417", "Gene", "Variants", "Allele Count", "QR Code")
+
+
+card.layout <- data.frame(column1, column2, column3)
+
+images <- read_csv("data/base64_icons.csv")
+names(images)[1] <- "Index"
+
+
 
 
 

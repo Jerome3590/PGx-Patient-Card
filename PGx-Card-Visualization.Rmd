@@ -41,7 +41,7 @@ library(gtable)
 ```{r Load Data}
 
 pgx_data <- read_csv("pgx_data.csv")
-names(pgx_data)[1] <- "Index"
+#names(pgx_data)[1] <- "Index"
 
 
 xlsx_card_front <- read_excel(here("data","PGx-card-layout.xlsx"), sheet = "front", col_names = TRUE)
@@ -58,8 +58,6 @@ names(images)[1] <- "Index"
 ```
 
 
-
-
 ```{r}
 
 cards <- pgx_data %>% group_by(`Sample ID`) %>% select(-1) %>% unique()
@@ -73,40 +71,6 @@ sample1_drugs <- sample1 %>% select(1,2,7:13) %>% unique()
 
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

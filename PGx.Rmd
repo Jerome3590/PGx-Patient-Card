@@ -105,7 +105,6 @@ FDA_Recommendations_df%<>% select(2,1,3,4)
 ```
 
 
-
 ```{r FDA Dataframe}
 
 FDA_df <- full_join(CPIC_df, FDA_Recommendations_df, by=c("Gene" = "Gene", "Drug" = "Drug"))
@@ -224,7 +223,7 @@ end <- 1:nrow(vip_df)
 repeat {
   
   png(vip_df[[7]][[start]])
-  qrcode_gen(vip_df[[6]][[start]])
+  qr_code(vip_df[[6]][[start]])
   dev.off()
   
   start = start + 1
@@ -252,7 +251,7 @@ image_to_base64(here("qr_codes"))
 
 
 # Move file to 'data' subfolder for future processing
-file.move("base64_qr_codes.csv", "data")
+file.move("base64_qr_codes.csv", "data", overwrite = TRUE)
 
 ```
 
@@ -292,7 +291,7 @@ PGx_df$Litid <- as.character(PGx_df$Litid)
 
 # Drop NAs and INFs
 is.na(PGx_df)<-sapply(PGx_df, is.infinite) 
-PGx_df[is.na(PGx_df)] <- "0"
+PGx_df[is.na(PGx_df)] <- '0'
 
 
 ```
